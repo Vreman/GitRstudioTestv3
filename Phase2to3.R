@@ -90,3 +90,5 @@ fit2 <- lme(fixed=ORR~factor(Phase)+Random, random=~Phase+Random|Id)
 
 anova(fit1, fit2)
 
+# extra stukje tekst
+
