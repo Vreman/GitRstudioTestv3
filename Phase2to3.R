@@ -1,30 +1,23 @@
 # This is an R script for a linear mixed effects model for estimating differences between phase II and phase III clinical trial results
 
-# It consists of three analyses:
-# 1. An analysis of objective response rate (ORR)
-# 2. An analysis of PFS
-# 3. An analysis of OS
+# It consists of four sections:
+# 1. General R codes for reference
+# 2. An analysis of objective response rate (ORR)
+# 3. An analysis of PFS
+# 4. An analysis of OS
 
-# 1. An analysis of ORR
 
-# note that we have paired data: the ORR between a phase 2 and 3 trial is for the same drug for the same indication
-# covariates that are in the database:
-# 1.1
-# 1.2
-# 1.3
-# 1.4
-# 1.5
-# 1.6
-# 1.7
-# 1.8
-# 1.9
-
+# 1. General R codes for reference
 library(survival)
 library(nlme)
+library(ggplot2)
+library(reshape2)
 install.packages("lme4")
 library(lme4)
 attach(namedata)
 detach(namedata)
+metafor #(package meta analyses and forest plots)
+
 tapply()
 interaction.plot(x.factor=Time,trace.factor=Cow,response=protein)
 plot(protein~Time)
@@ -51,7 +44,6 @@ library(lme4)
 fit.lgre <- glmer(oc~factor(ground)+I(height-mean(height))+(1|father),family=binomial)
 summary(fit.lgre)
 
-
 Twisk1<-read.table("Twisk1.dat",header=T)
 epi <- read.table("episode.txt",header=TRUE)
 dalmat <- read.table("dalmatian.csv",header=TRUE,sep=",")
@@ -67,28 +59,94 @@ getwd()
 summary(aov(chol~factor(time)+Error(id)))
 
 
-## that was it for the base functions
-# Now some data analysis
+## End of base functions
+
+# 2. An analysis of ORR
+# note that we have paired data: the ORR between a phase 2 and 3 trial is for the same drug for the same indication
+
+# Data analysis
+getwd()
+rm(list=ls())
+
+ORRdata <- read.table("DataTryoutv4.txt",header=TRUE)
+# ORRdata <- read.table("DataTryoutv3.csv",header=TRUE,sep=",")
+
+head(ORRdata)
+summary(ORRdata)
+
+attach(ORRdata)
+
+# plot(ORR~Phase)
+boxplot(ORR~Phase)
+boxplot(ORR~Dose)
+boxplot(ORR~Combination)
+
+interaction.plot(x.factor = Phase,trace.factor = Pair,response = ORR, xlab="Phase", ylab="ORR", legend=F)
 
 
-ORRfakev1 <- read.table("Fakedatav4.txt",header=TRUE)
-head(ORRfakev1)
-
-Id <- ORRfakev1$Id
-ORR <- ORRfakev1$ORR
-Phase <- ORRfakev1$Phase
-Random <- ORRfakev1$Randomized
-
-Random
-
-fit0 <- lme(fixed=ORR~factor(Phase), random=~Phase|Id)
-
-
+# Test the random effects
+# Random slope + intercept
+fit0 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization, random=~Phase|Pair, method="REML")
 summary(fit0)
-fit1 <- lme(fixed=ORR~factor(Phase)+Random, random=~Phase|Id)
-fit2 <- lme(fixed=ORR~factor(Phase)+Random, random=~Phase+Random|Id)
+# Only random intercept
+fit1 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization, random=~1|Pair, method="REML")
+summary(fit1)
+# Only random slope
+fit2 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization, random=~Phase-1|Pair, method="REML")
+summary(fit2)
 
-anova(fit1, fit2)
+anova(fit0, fit1)
+anova(fit0, fit2)
 
-# extra stukje tekst
+# With interaction:
+fit3 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization+Dose:Combination, random=~Phase|Pair, method="REML")
+summary(fit3)
+# Only random intercept
+fit4 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization+Dose:Combination, random=~1|Pair, method="REML")
+summary(fit4)
+# Only random slope
+fit5 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization+Dose:Combination, random=~Phase-1|Pair, method="REML")
+summary(fit5)
 
+anova(fit3, fit4)
+anova(fit3, fit5)
+
+# Conclusion based on this data (Datatryoutv4.txt): 
+# fit 3 is way better than 5: we need the random intercept.
+# fit 3 is not significantly better than fit4, so we use the simpler model without the random slope (fit4)
+
+# Test the fixed effects
+fit11 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Randomization+Dose:Combination, random=~1|Pair, method="ML")
+summary(fit11)
+anova(fit11)
+
+# Anova: least significant = randomization: lose that one
+fit12 <- lme(fixed=ORR~Phase+factor(Dose)+Combination+Dose:Combination, random=~1|Pair, method="ML")
+summary(fit12)
+anova(fit12)
+anova(fit11, fit12)
+
+# Anova: least significant = phase: lose that one
+fit13 <- lme(fixed=ORR~factor(Dose)+Combination+Dose:Combination, random=~1|Pair, method="ML")
+summary(fit4)
+anova(fit13)
+anova(fit12, fit13)
+
+# Anova: least significant = the interaction: lose that one
+fit14 <- lme(fixed=ORR~factor(Dose)+Combination, random=~1|Pair, method="ML")
+summary(fit14)
+anova(fit14)
+anova(fit13, fit14)
+
+# Anova: both remaining items are now significant = final model 
+
+# Compare final model to model with Phase in it:
+fit15 <- lme(fixed=ORR~Phase+factor(Dose)+Combination, random=~1|Pair, method="ML")
+summary(fit15)
+anova(fit15)
+anova(fit14, fit15)
+
+# Anova: phase is not significant & models do not differ significantly. 
+# Thus, phase is not an explanatory factor for differences in ORR (but dose & combination are)
+
+detach(ORRdata)
