@@ -80,6 +80,7 @@ attach(ORRdata)
 boxplot(ORR~Phase)
 boxplot(ORR~Dose)
 boxplot(ORR~Combination)
+boxplot(ORR~Randomization)
 
 interaction.plot(x.factor = Phase,trace.factor = Pair,response = ORR, xlab="Phase", ylab="ORR", legend=F)
 
@@ -128,7 +129,7 @@ anova(fit11, fit12)
 
 # Anova: least significant = phase: lose that one
 fit13 <- lme(fixed=ORR~factor(Dose)+Combination+Dose:Combination, random=~1|Pair, method="ML")
-summary(fit4)
+summary(fit13)
 anova(fit13)
 anova(fit12, fit13)
 
